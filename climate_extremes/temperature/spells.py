@@ -1,5 +1,6 @@
 """
 Deteksi spell panas (WSDI) dan spell dingin (CSDI) untuk data suhu.
+Diperbaiki untuk kompatibilitas pandas >=2.1 (hilangkan FutureWarning).
 """
 
 import pandas as pd
@@ -33,30 +34,37 @@ def calculate_wsdi_csdi(
     
     Returns
     -------
-    Tuple[pd.Series, pd.Series] : (WSDI, CSDI) dalam hari per tahun (float type untuk konsistensi NaN)
+    Tuple[pd.Series, pd.Series] : (WSDI, CSDI) dalam hari per tahun (float type)
     """
     # Buat boolean mask untuk spell
     df = df.copy()
     df['_warm_day'] = df[tmax_col] > p90_tmax
     df['_cold_day'] = df[tmin_col] < p10_tmin
     
-    # Hitung WSDI per tahun
-    wsdi = df.groupby('YEAR').apply(
-        lambda g: count_consecutive_days(
-            g['_warm_day'], 
-            lambda x: x,  # identity function untuk boolean series
-            min_spell_length=MIN_SPELL_DAYS
-        )
-    )
+    # === PERBAIKAN: GANTI groupby().apply() DENGAN LOOP EKSPLISIT ===
+    # Hindari FutureWarning di pandas >=2.1 dengan tidak menggunakan apply pada grouping columns
+    years = sorted(df['YEAR'].unique())
+    wsdi = pd.Series(index=years, dtype=float)
+    csdi = pd.Series(index=years, dtype=float)
     
-    # Hitung CSDI per tahun
-    csdi = df.groupby('YEAR').apply(
-        lambda g: count_consecutive_days(
-            g['_cold_day'],
+    for year in years:
+        year_data = df[df['YEAR'] == year]
+        
+        # Hitung WSDI untuk tahun ini
+        wsdi_val = count_consecutive_days(
+            year_data['_warm_day'], 
             lambda x: x,
             min_spell_length=MIN_SPELL_DAYS
         )
-    )
+        wsdi.loc[year] = wsdi_val
+        
+        # Hitung CSDI untuk tahun ini
+        csdi_val = count_consecutive_days(
+            year_data['_cold_day'],
+            lambda x: x,
+            min_spell_length=MIN_SPELL_DAYS
+        )
+        csdi.loc[year] = csdi_val
     
     # Pastikan tipe data float untuk konsistensi NaN
     wsdi = wsdi.astype(float)

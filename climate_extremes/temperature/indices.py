@@ -1,6 +1,7 @@
 """
 Implementasi idxTemp dengan graceful degradation untuk data observasi BMKG yang tidak sempurna.
 Menghilangkan validasi ketat Tmin ≤ Tave ≤ Tmax yang tidak realistis untuk data nyata.
+Diperbaiki untuk kompatibilitas pandas >=2.1 (tanpa FutureWarning).
 """
 
 import pandas as pd
@@ -176,16 +177,21 @@ def idxTemp(
         except Exception:
             pass  # Biarkan NaN jika baseline gagal
         
-        # WSDI
+        # WSDI (dengan loop eksplisit untuk hindari FutureWarning)
         if 'p90_tmax' in locals():
             try:
                 wsdi_series = pd.Series(index=years, dtype=float)
+                csdi_series = pd.Series(index=years, dtype=float)
+                
                 for year in years:
                     year_df = df[df['YEAR'] == year].copy()
                     if len(year_df) > 0:
-                        wsdi, _ = calculate_wsdi_csdi(year_df, tmax, tmin if (tmin and tmin in year_df.columns) else tmax, p90_tmax, 0)
-                        wsdi_series.loc[year] = wsdi.iloc[0] if not wsdi.empty else np.nan
+                        wsdi_val, csdi_val = calculate_wsdi_csdi(year_df, tmax, tmin if (tmin and tmin in year_df.columns) else tmax, p90_tmax, 0)
+                        wsdi_series.loc[year] = wsdi_val.iloc[0] if not wsdi_val.empty else np.nan
+                        csdi_series.loc[year] = csdi_val.iloc[0] if not csdi_val.empty else np.nan
+                
                 result['WSDI'] = wsdi_series
+                result['CSDI'] = csdi_series
             except Exception:
                 pass
     
@@ -204,19 +210,6 @@ def idxTemp(
             result['Tn90'] = Tn90.round(OUTPUT_DECIMALS_TEMPERATURE)
         except Exception:
             pass
-        
-        # CSDI
-        if 'p10_tmin' in locals():
-            try:
-                csdi_series = pd.Series(index=years, dtype=float)
-                for year in years:
-                    year_df = df[df['YEAR'] == year].copy()
-                    if len(year_df) > 0:
-                        _, csdi = calculate_wsdi_csdi(year_df, tmax if (tmax and tmax in year_df.columns) else tmin, tmin, 0, p10_tmin)
-                        csdi_series.loc[year] = csdi.iloc[0] if not csdi.empty else np.nan
-                result['CSDI'] = csdi_series
-            except Exception:
-                pass
     
     # --- TAVE-BASED INDICES ---
     if tave and tave in df.columns:
