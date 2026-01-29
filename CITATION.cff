@@ -1,0 +1,22 @@
+cff-version: 1.2.0
+message: "If you use this software in your research, please cite it as below."
+authors:
+  - family-names: "BMKG Climate Center"
+    given-names: ""
+    affiliation: "Badan Meteorologi, Klimatologi, dan Geofisika"
+    city: "Jakarta"
+    country: "Indonesia"
+title: "Climate Extremes Indices Library"
+version: 1.0.0
+date-released: 2026-01-29
+license: MIT
+repository-code: https://github.com/your-username/climate-extremes
+url: https://github.com/your-username/climate-extremes
+doi: 10.5281/zenodo.XXXXXXX
+type: software
+keywords:
+  - climate extremes
+  - etccdi
+  - indonesia
+  - bmkg
+  - meteorology
