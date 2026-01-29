@@ -92,3 +92,4 @@ rain_indices = idxRain(
 
 # Check QC flags for data quality assessment
 print(rain_indices[['qc_flag', 'baseline_period', 'R95p_threshold_mm']].head())
+pip install git+https://github.com/firmanshhh/climate-extreme-indices

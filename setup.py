@@ -1,21 +1,31 @@
 """
-setup.py untuk instalasi development mode
-Jalankan dari root project: pip install -e .
+Minimal setup.py for local installation and development
+No PyPI publishing required
 """
 
 from setuptools import setup, find_packages
 
 setup(
-    name="climate_extremes",
+    name="climate-extremes",
     version="1.0.0",
-    description="ETCCDI Climate Extremes Indices Calculator for Tropical Regions",
+    description="ETCCDI climate extremes indices calculator for tropical regions",
     author="BMKG Climate Center",
-    packages=find_packages(exclude=["tests", "tests.*"]),
+    author_email="climate.data@bmkg.go.id",
+    packages=find_packages(exclude=["tests", "examples", "docs"]),
     install_requires=[
         "pandas>=1.5.0",
         "numpy>=1.21.0",
-        "pytest>=7.0.0",
     ],
+    extras_require={
+        "dev": [
+            "pytest>=7.0.0",
+            "pytest-cov>=4.0.0",
+            "black>=23.0.0",
+            "isort>=5.12.0",
+            "matplotlib>=3.5.0",
+            "jupyter>=1.0.0",
+        ],
+    },
     python_requires=">=3.8",
     classifiers=[
         "Development Status :: 5 - Production/Stable",

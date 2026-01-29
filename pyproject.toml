@@ -1,0 +1,78 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bmkg-climate-extremes"  # ← GANTI DENGAN NAMA UNIK ANDA
+version = "0.1.0"
+description = "ETCCDI-compliant climate extreme indices calculator for tropical regions (Indonesia/BMKG)"
+readme = "README.md"
+requires-python = ">=3.8"
+license = {text = "MIT"}
+authors = [
+    {name = "BMKG Climate Center", email = "climate.data@bmkg.go.id"}
+]
+maintainers = [
+    {name = "BMKG Climate Center", email = "climate.data@bmkg.go.id"}
+]
+keywords = [
+    "climate", "extremes", "etccdi", "indonesia", "bmkg", 
+    "meteorology", "temperature", "precipitation", "indices"
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Atmospheric Science",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Operating System :: OS Independent",
+    "Natural Language :: English",
+    "Natural Language :: Indonesian"
+]
+
+dependencies = [
+    "pandas>=1.5.0",
+    "numpy>=1.21.0"
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "black>=23.0.0",
+    "isort>=5.12.0",
+    "mypy>=1.0.0",
+    "flake8>=6.0.0",
+    "matplotlib>=3.5.0; python_version >= '3.8'"
+]
+docs = [
+    "sphinx>=5.0.0",
+    "sphinx-rtd-theme>=1.0.0"
+]
+
+[project.urls]
+Homepage = "https://github.com/YOUR_USERNAME/climate-extremes"
+Documentation = "https://github.com/YOUR_USERNAME/climate-extremes#readme"
+Repository = "https://github.com/YOUR_USERNAME/climate-extremes"
+Issues = "https://github.com/YOUR_USERNAME/climate-extremes/issues"
+Changelog = "https://github.com/YOUR_USERNAME/climate-extremes/blob/main/CHANGELOG.md"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["climate_extremes*"]
+exclude = ["tests*", "examples*", "docs*"]
+
+[tool.setuptools.package-data]
+climate_extremes = ["py.typed"]  # Untuk type hints (opsional)
+
+[tool.black]
+line-length = 88
+target-version = ['py38']
+
+[tool.isort]
+profile = "black"
+line_length = 88
