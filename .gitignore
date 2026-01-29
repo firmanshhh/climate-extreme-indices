@@ -60,4 +60,6 @@ Thumbs.db
 .idea/
 *.swp
 *.swo
-*~
+*~data/
+*.csv
+*.nc
