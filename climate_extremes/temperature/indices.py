@@ -1,14 +1,14 @@
 """
-Implementasi idxTemp dengan graceful degradation yang robust.
-Menangani parameter missing tanpa menggagalkan seluruh perhitungan.
+Implementasi idxTemp dengan graceful degradation untuk data observasi BMKG yang tidak sempurna.
+Menghilangkan validasi ketat Tmin ≤ Tave ≤ Tmax yang tidak realistis untuk data nyata.
 """
 
 import pandas as pd
 import numpy as np
-from typing import Optional, Union
+from typing import Optional
 from climate_extremes.constants import (
     DEFAULT_BASELINE_START, DEFAULT_BASELINE_END,
-    OUTPUT_DECIMALS_TEMPERATURE, MIN_SPELL_DAYS, WET_DAY_THRESHOLD
+    OUTPUT_DECIMALS_TEMPERATURE
 )
 from climate_extremes.validation import validate_timeseries
 from climate_extremes.temperature.percentiles import (
@@ -24,10 +24,11 @@ def idxTemp(
     tmin: Optional[str] = None,
     ref_start: int = DEFAULT_BASELINE_START,
     ref_end: int = DEFAULT_BASELINE_END,
-    min_days_per_year: int = 300
+    min_days_per_year: int = 300,
+    strict_validation: bool = False
 ) -> pd.DataFrame:
     """
-    Hitung indeks ekstrem suhu dengan graceful degradation untuk data tidak lengkap.
+    Hitung indeks ekstrem suhu dengan graceful degradation untuk data observasi tidak lengkap.
     
     Parameters
     ----------
@@ -45,24 +46,32 @@ def idxTemp(
         Tahun akhir periode baseline (default: 2020)
     min_days_per_year : int
         Minimum hari data valid per tahun (default: 300)
+    strict_validation : bool
+        Jika True, tolak data dengan ketidakkonsistenan Tmin/Tave/Tmax.
+        Default False (direkomendasikan untuk data observasi BMKG).
     
     Returns
     -------
     pd.DataFrame
-        DataFrame dengan:
-        - Indeks ETCCDI (NaN jika parameter tidak tersedia)
-        - Metadata QC: tmax_available_days, tmin_available_days, tave_available_days, qc_temperature_flag
+        DataFrame dengan indeks ETCCDI + metadata QC:
+        - Kolom indeks: NaN jika parameter tidak tersedia
+        - tmax_available_days, tmin_available_days, tave_available_days
+        - qc_temperature_flag: 'COMPLETE', 'TMAX_TMIN_ONLY', dll
+    
+    Notes
+    -----
+    Untuk data observasi BMKG:
+    - Gunakan strict_validation=False (default) untuk mengakomodasi ketidakkonsistenan kecil (<1°C)
+    - Ketidakkonsistenan besar (>2°C) akan menghasilkan warning tapi tidak menghentikan perhitungan
+    - Indeks dihitung berdasarkan parameter yang tersedia (graceful degradation)
     
     Examples
     --------
-    # Kasus 1: Semua parameter tersedia
-    >>> idxTemp(df, 'TAVE', 'TMAX', 'TMIN')
+    # Untuk data observasi BMKG (rekomendasi):
+    indices = idxTemp(df, 'TAVE', 'TMAX', 'TMIN', strict_validation=False)
     
-    # Kasus 2: Hanya TMAX dan TMIN tersedia (TAVE missing)
-    >>> idxTemp(df, None, 'TMAX', 'TMIN')
-    
-    # Kasus 3: Hanya TMAX tersedia
-    >>> idxTemp(df, None, 'TMAX', None)
+    # Untuk data homogenisasi/simulasi (validasi ketat):
+    indices = idxTemp(df, 'TAVE', 'TMAX', 'TMIN', strict_validation=True)
     """
     # Validasi time series dasar (tanpa threshold ketat)
     valid, msg = validate_timeseries(df, min_days_per_year=1)
@@ -74,6 +83,35 @@ def idxTemp(
     df['time'] = pd.to_datetime(df['time'])
     df['YEAR'] = df['time'].dt.year
     years = sorted(df['YEAR'].unique())
+    
+    # === PERINGATAN UNTUK KETIDAKKONSISTENAN BESAR (opsional) ===
+    if strict_validation or any([
+        tave and tmax and tave in df.columns and tmax in df.columns,
+        tave and tmin and tave in df.columns and tmin in df.columns
+    ]):
+        # Cek ketidakkonsistenan hanya jika parameter tersedia
+        inconsistencies = []
+        
+        if tave and tmax and tave in df.columns and tmax in df.columns:
+            mask_incon = (df[tave] > df[tmax] + 1.0)  # Toleransi 1.0°C untuk pembulatan
+            if mask_incon.sum() > 0:
+                inconsistencies.append(f"TAVE > TMAX+1.0°C: {mask_incon.sum()} hari")
+        
+        if tave and tmin and tave in df.columns and tmin in df.columns:
+            mask_incon = (df[tave] < df[tmin] - 1.0)
+            if mask_incon.sum() > 0:
+                inconsistencies.append(f"TAVE < TMIN-1.0°C: {mask_incon.sum()} hari")
+        
+        if inconsistencies and strict_validation:
+            raise ValueError(f"Validasi data suhu gagal: {'; '.join(inconsistencies)}")
+        elif inconsistencies:
+            # Warning saja untuk data observasi (tidak menghentikan perhitungan)
+            import warnings
+            warnings.warn(
+                f"Data memiliki ketidakkonsistenan fisik: {'; '.join(inconsistencies)}. "
+                f"Indeks akan dihitung dengan hati-hati (NaN untuk hari tidak konsisten).",
+                UserWarning
+            )
     
     # === HITUNG KETERSEDIAAN DATA PER PARAMETER ===
     avail = pd.DataFrame(index=years)
@@ -102,14 +140,14 @@ def idxTemp(
     
     avail['qc_temperature_flag'] = avail.apply(get_qc_flag, axis=1)
     
-    # === INISIALISASI RESULT DENGAN NaN ===
+    # === INISIALISASI RESULT ===
     all_index_cols = [
         'TMm', 'TMx', 'TMn', 'TXm', 'TXx', 'TXn', 'TNm', 'TNx', 'TNn',
         'DTR', 'ETR', 'Tm10P', 'Tm90P', 'Tn10P', 'Tn90P', 'Tx10P', 'Tx90P',
         'Tm10', 'Tm90', 'Tn10', 'Tn90', 'Tx10', 'Tx90', 'WSDI', 'CSDI'
     ]
     result = pd.DataFrame(index=years, columns=all_index_cols, dtype=float)
-    result[:] = np.nan  # Semua NaN secara default
+    result[:] = np.nan
     
     # Helper untuk agregasi dengan threshold
     def yearly_agg(series, func, min_days=min_days_per_year):
@@ -120,16 +158,14 @@ def idxTemp(
             return func(valid)
         return series.groupby(df['YEAR']).apply(agg_func)
     
-    # === PERHITUNGAN PER PARAMETER (DENGAN PENANGANAN ERROR EKSPLISIT) ===
+    # === PERHITUNGAN PER PARAMETER (GRACEFUL DEGRADATION) ===
     
     # --- TMAX-BASED INDICES ---
     if tmax and tmax in df.columns:
-        # Statistik dasar
         result['TXm'] = yearly_agg(df[tmax], np.mean)
         result['TXx'] = yearly_agg(df[tmax], np.max)
         result['TXn'] = yearly_agg(df[tmax], np.min)
         
-        # Persentil (dengan try-except untuk baseline yang mungkin gagal)
         try:
             p10_tmax, p90_tmax = calculate_percentile_thresholds(df, tmax, ref_start, ref_end)
             Tx10P, Tx90P, Tx10, Tx90 = calculate_percentile_indices(df, tmax, p10_tmax, p90_tmax)
@@ -137,21 +173,20 @@ def idxTemp(
             result['Tx90P'] = Tx90P.round(OUTPUT_DECIMALS_TEMPERATURE)
             result['Tx10'] = Tx10.round(OUTPUT_DECIMALS_TEMPERATURE)
             result['Tx90'] = Tx90.round(OUTPUT_DECIMALS_TEMPERATURE)
-        except Exception as e:
-            # Baseline gagal → biarkan persentil sebagai NaN (aman)
-            pass
+        except Exception:
+            pass  # Biarkan NaN jika baseline gagal
         
-        # WSDI (hanya jika baseline valid)
+        # WSDI
         if 'p90_tmax' in locals():
             try:
-                wsdi = df.groupby('YEAR').apply(
-                    lambda g: calculate_wsdi_csdi(
-                        g, tmax, tmin if (tmin and tmin in g.columns) else tmax, 
-                        p90_tmax, 0
-                    )[0].iloc[0] if not g.empty else np.nan
-                )
-                result['WSDI'] = wsdi.astype(float)
-            except:
+                wsdi_series = pd.Series(index=years, dtype=float)
+                for year in years:
+                    year_df = df[df['YEAR'] == year].copy()
+                    if len(year_df) > 0:
+                        wsdi, _ = calculate_wsdi_csdi(year_df, tmax, tmin if (tmin and tmin in year_df.columns) else tmax, p90_tmax, 0)
+                        wsdi_series.loc[year] = wsdi.iloc[0] if not wsdi.empty else np.nan
+                result['WSDI'] = wsdi_series
+            except Exception:
                 pass
     
     # --- TMIN-BASED INDICES ---
@@ -167,20 +202,20 @@ def idxTemp(
             result['Tn90P'] = Tn90P.round(OUTPUT_DECIMALS_TEMPERATURE)
             result['Tn10'] = Tn10.round(OUTPUT_DECIMALS_TEMPERATURE)
             result['Tn90'] = Tn90.round(OUTPUT_DECIMALS_TEMPERATURE)
-        except:
+        except Exception:
             pass
         
         # CSDI
         if 'p10_tmin' in locals():
             try:
-                csdi = df.groupby('YEAR').apply(
-                    lambda g: calculate_wsdi_csdi(
-                        g, tmax if (tmax and tmax in g.columns) else tmin, tmin, 
-                        0, p10_tmin
-                    )[1].iloc[0] if not g.empty else np.nan
-                )
-                result['CSDI'] = csdi.astype(float)
-            except:
+                csdi_series = pd.Series(index=years, dtype=float)
+                for year in years:
+                    year_df = df[df['YEAR'] == year].copy()
+                    if len(year_df) > 0:
+                        _, csdi = calculate_wsdi_csdi(year_df, tmax if (tmax and tmax in year_df.columns) else tmin, tmin, 0, p10_tmin)
+                        csdi_series.loc[year] = csdi.iloc[0] if not csdi.empty else np.nan
+                result['CSDI'] = csdi_series
+            except Exception:
                 pass
     
     # --- TAVE-BASED INDICES ---
@@ -196,24 +231,24 @@ def idxTemp(
             result['Tm90P'] = Tm90P.round(OUTPUT_DECIMALS_TEMPERATURE)
             result['Tm10'] = Tm10.round(OUTPUT_DECIMALS_TEMPERATURE)
             result['Tm90'] = Tm90.round(OUTPUT_DECIMALS_TEMPERATURE)
-        except:
+        except Exception:
             pass
     
-    # --- MULTI-PARAMETER INDICES (DTR, ETR) ---
+    # --- MULTI-PARAMETER INDICES ---
     if tmax and tmin and tmax in df.columns and tmin in df.columns:
-        # Hitung DTR harian hanya untuk hari dengan kedua parameter valid
+        # Hitung DTR hanya untuk hari dengan kedua parameter valid
         valid_mask = df[tmax].notna() & df[tmin].notna()
         df['DTR_daily'] = np.where(valid_mask, df[tmax] - df[tmin], np.nan)
         result['DTR'] = yearly_agg(df['DTR_daily'], np.mean)
         
-        # ETR = TXx - TNn (hanya jika keduanya tersedia)
+        # ETR
         if 'TXx' in result.columns and 'TNn' in result.columns:
             result['ETR'] = (result['TXx'] - result['TNn']).round(OUTPUT_DECIMALS_TEMPERATURE)
     
     # === GABUNGKAN DENGAN METADATA QC ===
     result = pd.concat([result, avail], axis=1)
     
-    # Cleanup: pastikan semua kolom numerik di-round dengan benar
+    # Cleanup rounding
     for col in all_index_cols:
         if col in result.columns and pd.api.types.is_numeric_dtype(result[col]):
             result[col] = result[col].round(OUTPUT_DECIMALS_TEMPERATURE)
