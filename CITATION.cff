@@ -1,17 +1,17 @@
 cff-version: 1.2.0
 message: "If you use this software in your research, please cite it as below."
 authors:
-  - family-names: "BMKG Climate Center"
-    given-names: ""
-    affiliation: "Badan Meteorologi, Klimatologi, dan Geofisika"
-    city: "Jakarta"
-    country: "Indonesia"
+  - name: BMKG Climate Center
+    affiliation: Badan Meteorologi, Klimatologi, dan Geofisika
+    city: Jakarta
+    country: Indonesia
+    orcid: 0000-0000-0000-0000
 title: "Climate Extremes Indices Library"
 version: 1.0.0
 date-released: 2026-01-29
 license: MIT
-repository-code: https://github.com/your-username/climate-extremes
-url: https://github.com/your-username/climate-extremes
+repository-code: https://github.com/firmanshhh/climate-extreme-indices
+url: https://github.com/firmanshhh/climate-extreme-indices
 doi: 10.5281/zenodo.XXXXXXX
 type: software
 keywords:
@@ -20,3 +20,24 @@ keywords:
   - indonesia
   - bmkg
   - meteorology
+  - temperature indices
+  - precipitation indices
+  - tropical climate
+  - heatwave
+  - flood
+references:
+  - type: article
+    author:
+      - family-names: Zhang
+        given-names: Xuebin
+      - family-names: Aguilar
+        given-names: Enric
+      - family-names: Sensoy
+        given-names: Serhat
+    title: "Indices for monitoring changes in extremes based on daily temperature and precipitation data"
+    journal: "WIREs Climate Change"
+    year: 2011
+    volume: 2
+    issue: 6
+    pages: 851-870
+    doi: 10.1002/wcc.147

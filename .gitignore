@@ -36,7 +36,7 @@ htmlcov/
 .ipynb_checkpoints/
 *.ipynb
 
-# Data (jangan commit data mentah!)
+# Data (JANGAN commit data observasi aktual!)
 data/
 *.csv
 *.nc
@@ -45,6 +45,9 @@ data/
 *.hdf5
 *.grib
 *.grib2
+*.mat
+*.xls
+*.xlsx
 
 # OS
 .DS_Store
@@ -54,12 +57,21 @@ data/
 .Trashes
 ehthumbs.db
 Thumbs.db
+*.swp
+*.swo
 
 # Editors
 .vscode/
 .idea/
-*.swp
-*.swo
-*~data/
-*.csv
-*.nc
+*.sublime-project
+*.sublime-workspace
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Backup files
+*~
+*.bak
+*.tmp
